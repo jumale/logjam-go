@@ -60,6 +60,8 @@ type Logger interface {
 	Printf(fmt string, v ...interface{})
 }
 
+var logger Logger
+
 type middleware struct {
 	*Options
 	handler  http.Handler
@@ -91,6 +93,8 @@ func NewMiddleware(handler http.Handler, options *Options) http.Handler {
 	if m.Logger == nil {
 		m.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
+
+	logger = m.Logger
 
 	return m
 }
@@ -240,30 +244,16 @@ func (m *middleware) sendMessage(msg []byte) {
 // SetLogjamHeaders makes sure all X-Logjam-* Headers are copied into the outgoing request.
 // call this before you call other XING APIs
 func SetLogjamHeaders(hasContext HasContext, outgoing *http.Request) {
-	ctx := hasContext.Context()
-
-	var incomingHeaders http.Header
-	if outgoing.Header == nil {
-		outgoing.Header = http.Header{}
-	}
-
-	switch incoming := ctx.Value(requestKey).(type) {
-	case *http.Request:
-		incomingHeaders = incoming.Header
-	case *request:
-		incomingHeaders = incoming.request.Header
+	incoming, ok := hasContext.Context().Value(requestKey).(*request)
+	if ok {
+		if outgoing.Header == nil {
+			outgoing.Header = http.Header{}
+		}
 		outgoing.Header.Set("X-Logjam-Request-Action", incoming.actionName())
 		outgoing.Header.Set("X-Logjam-Request-Id", incoming.id())
-	default:
-		return
-	}
-
-	for key, value := range incomingHeaders {
-		if len(value) == 0 {
-			continue
-		}
-		if strings.HasPrefix(strings.ToLower(key), "x-logjam") {
-			outgoing.Header.Set(key, value[0])
-		}
+		logger.Println("setting headers:", outgoing.Header)
+	} else {
+		logger.Println("couldn't set required outgoing headers, expect call sequence issues.",
+			"Please ensure that you are using the Logjam middleware.")
 	}
 }
