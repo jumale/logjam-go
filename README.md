@@ -14,11 +14,12 @@ brew install zmq
 ```
 
 ## How to use it
-Install via `go get github.com/xing/logjam-go` and then inside your code create a middleware like this:
+Install via `go get github.com/xing/logjam-go` and then inside your code create a handler wrapper like this:
 
 ```go
-func logjamMiddleware(next http.Handler) http.Handler {
-	return logjam.NewMiddleware(next, &logjam.Options{
+// Wrap HTTP handler with logjam logging
+func handlerWithLogjam(handler http.Handler) http.Handler {
+	return logjam.NewMiddleware(handler, &logjam.Options{
 		AppName: "MyApp",
 		EnvName: "production",
 		Logger:  log.New(os.Stderr, "API", log.LstdFlags),
@@ -26,16 +27,15 @@ func logjamMiddleware(next http.Handler) http.Handler {
 }
 ```
 
-Then register the middleware with your router like this:
+Then wrap your HTTP handler before passing it to server:
 
 ```go
     r := mux.NewRouter()
     ...
-    r.Use(logjamMiddleware)
-    ...
+    http.ListenAndServe(":80", handlerWithLogjam(r))
 ```
 
-This example uses the Gorilla Mux package but it should also work with other router packages.
+This example uses the Gorilla Mux package but it should also work with any HTTP handler implementation.
 
 You also need to set environment variable to point to the actual logjam broker instance:
 
